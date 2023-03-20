@@ -1,0 +1,142 @@
+---
+title: "data 358 lab8 notes"
+author: "Taylor Stacy"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    number_section: no
+    toc: no
+    toc_depth: 3
+    toc_float: yes
+    code_folding: show
+    css: lab_templet.css
+---
+look at lab slides and update
+```{r setup, include=FALSE}
+rm(list=ls())
+library(AmesHousing)
+library(tidyverse)
+library(caret)
+# new packages
+library(rpart)
+library(rpart.plot)
+library(ISLR)
+library(rattle)
+library(RColorBrewer)
+library(gbm)
+library(randomForest)
+library(vip)
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Data
+```{r}
+ames <- AmesHousing::make_ames()
+glimpse(ames)
+```
+## Data Splitting
+```{r}
+set.seed(1234)
+index <- createDataPartition(ames$Sale_Price,
+                             p= .8,
+                             list = FALSE)
+ames_train <- ames[index,]
+ames_test <- ames[-index,]
+```
+
+## Random Forest Model
+```{r}
+set.seed(1234)
+start_time <- Sys.time()
+ames_bag <- randomForest(
+  Sale_Price~.,
+  data = ames_train,
+  mtry = 80, 
+  importance = TRUE)
+end_time <- Sys.time()
+end_time -start_time
+```
+
+## Number of Optimal Trees
+```{r}
+est_bag <- predict(
+  ames_bag, 
+  newdata = ames_test)
+ggplot() + 
+    geom_point(
+      aes(x = ames_test$Sale_Price, 
+          y = est_bag)) +
+    geom_abline()
+```
+\
+## Feature Importance
+```{r}
+vip(ames_bag, 
+    num_features = 20,
+    bar = FALSE)
+```
+
+## Random Forest 2
+```{r}
+start_time2 <- Sys.time()
+set.seed(1234)
+ames_rf <- randomForest(Sale_Price ~.,
+                        data = ames_train,
+                        importance = TRUE)
+end_time2 <- Sys.time()
+start_time2 - end_time2
+```
+```{r}
+est_rf <- predict(
+  ames_rf, 
+  newdata = ames_test)
+ggplot() + 
+    geom_point(
+      aes(x = ames_test$Sale_Price, 
+          y = est_rf)) +
+    geom_abline()
+```
+
+## Test MSE
+```{r}
+mean((est_bag - ames_test$Sale_Price)^2)
+
+# random forest
+mean((est_bag - ames_test$Sale_Price)^2)
+```
+
+# Basic Gradiatn Boosting Machines (GBM)
+```{r}
+start_time3 <- Sys.time()
+set.seed(1234)
+ames_gbm1 <- gbm(
+  formula = Sale_Price ~ .,
+  data = ames_train,
+  # SSE loss function
+  distribution = "gaussian",  
+  n.trees = 5000,
+  shrinkage = 0.1,
+  interaction.depth = 3,
+  n.minobsinnode = 10,
+  cv.folds = 10)
+end_time3 <- Sys.time()
+```
+
+## Fit Summary
+```{r}
+ames_gbm1
+
+# find index for number trees with minimum CV error
+best <- which.min(ames_gbm1$cv.error)
+# get Root Mean Squared Error
+paste("RMSE: ", sqrt(ames_gbm1$cv.error[best]))
+```
+
+## Plot cross-validation SSE
+```{r}
+options(scipen=999) 
+# plot error curve
+gbm.perf(ames_gbm1, method = "cv")
+#> [1] 1142
+(cv_sse <- round(sqrt(ames_gbm1$cv.error[best]),0))
+```
+

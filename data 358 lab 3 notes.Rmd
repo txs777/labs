@@ -1,0 +1,178 @@
+---
+title: "lab03_notes"
+subtitle: "Linear Regression"
+author: "Taylor Stacy"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    number_section: no
+    toc: no
+    toc_depth: 3
+    toc_float: yes
+    code_folding: show
+    css: lab_templet.css
+---
+## Required packages
+```{r setup, include=FALSE}
+library(tidyverse)
+library(here)
+library(caret)
+
+library(MASS)
+library(gridExtra)
+library(corrplot)
+library(plotly)
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+## Data
+```{r}
+data("Boston")
+```
+## Data Exporation: Distribution of the response variable
+```{r}
+summary(Boston$medv)
+
+p1 <- ggplot(Boston, aes(x=medv)) +
+  geom_histogram()
+p2 <- ggplot(Boston, aes(x=medv)) +
+  geom_density()
+grid.arrange(p1, p2, ncol =2)
+```
+
+Except for a few outliers the data seems to be roughly symmetric
+
+## Missing Data
+```{r}
+Boston %>% 
+  summarize_all(funs(sum(is.na(.)))) %>% 
+  gather()
+```
+```{r}
+Boston2 <- Boston %>% 
+  select(-chas)
+corr <- round(cor(Boston2),2)
+
+corrplot(corr, diag = FALSE,
+         method = 'circle',
+         type = 'upper',
+         addCoef.col = 'black',
+         number.cex = .5)
+```
+Highly correlated pair : 
+- rad, tax
+- age, dis
+Highly correlated with 'medv'
+- lstat
+- rm
+
+## Data Splitting
+```{r}
+set.seed(123)
+inTrain <- createDataPartition(Boston$medv, p =0.8, list = FALSE)
+
+train <- Boston[inTrain,]
+test <- Boston[-inTrain,]
+```
+## Model Training
+```{r}
+set.seed(1234)
+tr.control <- trainControl(method = 'repeatedcv',
+                           number = 10,
+                           repeats = 5)
+model1 <- train( form = medv ~ lstat,
+                 data = train,
+                  method = 'lm',
+                 trControl = tr.control)
+model1
+summary(model1)
+```
+```{r}
+set.seed(1234)  # for reproducibility
+tr.control <-trainControl(method = 'repeatedcv',
+                          number = 10,
+                          repeats = 5)
+model2 <- train(form = medv ~ lstat + age,
+                data = train,
+                method = "lm", 
+                trControl = tr.control)
+model2
+summary(model2)
+```
+```{r}
+set.seed(1234)  # for reproducibility
+tr.control <-trainControl(method = 'repeatedcv',
+                          number = 10,
+                          repeats = 5)
+model3 <- train(form = medv ~ lstat + age + lstat:age,
+                data = train,
+                method = "lm", 
+                trControl = tr.control)
+model3
+summary(model3)
+```
+```{r}
+set.seed(1234)  # for reproducibility
+tr.control <-trainControl(method = 'repeatedcv',
+                          number = 10,
+                          repeats = 5)
+model4 <- train(form = medv ~ .,
+                data = train,
+                method = "lm", 
+                trControl = tr.control)
+model4
+summary(model4)
+```
+```{r}
+set.seed(1234)  # for reproducibility
+tr.control <-trainControl(method = 'repeatedcv',
+                          number = 10,
+                          repeats = 5)
+model5 <- train(form = medv ~ . -indus -age -tax,
+                data = train,
+                method = "lm", 
+                trControl = tr.control
+  )
+model5
+summary(model5)
+```
+## Comaparing Models
+```{r}
+perform<-resamples(list(model1, model2, model3, model4, model5))
+summary(perform)
+
+options('width'=250)
+round(summary(perform)$statistics$MAE[,-7],8)
+
+options('width'=250)
+round(summary(perform)$statistics$RMSE[,-7],8)
+
+options('width'=250)
+round(summary(perform)$statistics$Rsquared[,-7],8)
+```
+## Model Validation
+```{r}
+# Add a column for predicted value
+test<-test %>% 
+  mutate(predicted=predict(model5,data.frame(test)))
+# rename the columns
+dat<-test %>%
+  select(predicted, medv) %>% 
+  rename(pred=predicted, obs=medv)
+# compute error metrics
+defaultSummary(dat)  
+#>      RMSE  Rsquared       MAE 
+#> 4.6126931 0.7602067 3.4938338
+```
+
+
+
+
+
+
+
+
+
+
+

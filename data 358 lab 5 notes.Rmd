@@ -1,0 +1,119 @@
+---
+title: "DATA358_Lab5_notes"
+subtitle: "Classification Methods: Logistic Model"
+author: "Taylor Stacy"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    number_section: no
+    toc: no
+    toc_depth: 3
+    toc_float: yes
+    code_folding: show
+    css: lab_templet.css
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(caret)
+library(rsample)
+library(corrplot)
+library(modeldata)
+library(vip)
+library(ROCR)
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+## Data
+```{r}
+data("attrition", package= "modeldata")
+```
+
+```{r}
+attri <- attrition %>% 
+  select_if(
+    function(col) is.numeric(col)|
+    is.ordered(col)
+  ) %>% 
+  mutate_if(is.ordered, as.integer)
+
+M <- round(cor(attri),4)
+corrplot(M, diag = FALSE,
+         method = "circle",
+         type = "upper",
+         addCoef.col = "black",
+         tl.col = "black",
+         tl.srt = 45,
+         tl.cex = .5,
+         number.cex =.5)
+```
+
+## Distribution of Response Variable
+```{r}
+attrition %>% 
+  group_by(Attrition) %>% 
+  summarise(cnt=n()) %>% 
+  mutate(prop=cnt/sum(cnt))
+```
+## Data Splitting
+```{r}
+set.seed(1234)
+inTrain <- createDataPartition(attrition$Attrition,
+                               p=0.8,
+                               list = F)
+attri_train <- attrition[inTrain,]
+attri_test <- attrition[-inTrain,]
+```
+## Fitting a Logistic Model using `caret`
+```{r}
+fitControl <- trainControl(method = "repeatedcv",
+                           number = 10,
+                           repeats =5)
+set.seed(1234)
+logit_fit <- train(form = Attrition~.,
+                   data = attri_train,
+                   method = "glm",
+                   family = "binomial",
+                   trControl = fitControl)
+```
+## Explorting Output
+```{r}
+logit_fit
+names(logit_fit)
+logit_fit$finalModel
+```
+## Assesing Model Accuracy
+### Class Prediction
+```{r}
+pred_class <- predict(logit_fit, attri_test)
+head(pred_class)
+
+pred_prob <- predict(logit_fit, attri_train, type ="prob")
+```
+### Confusion Matrix
+```{r}
+confusionMatrix(data=relevel(pred_class, ref = "Yes"),
+                reference=relevel(attri_test$Attrition, ref = "Yes"))
+table(attri_test$Attrition) %>% 
+  prop.table()
+```
+## ROC Curve
+```{r}
+m2_prob <- predict(logit_fit, attri_test, type = "prob")$Yes
+perform2 <- prediction(m2_prob,attri_test$Attrition)
+roc_ROC <- performance(perform2, measure = "tpr", x.measure = "fpr")
+plot(roc_ROC, col = "blue")
+segments(0,0,1,1, col = "red")
+
+auc_ROC <- performance(perform2,
+                       measure = "auc")
+auc_ROC@y.values[[1]]
+```
+## Variable Importance
+```{r}
+vip(logit_fit, num_features = 20)
+```
+
+
+

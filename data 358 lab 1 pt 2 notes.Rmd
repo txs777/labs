@@ -1,0 +1,196 @@
+---
+title: "DATA358 Lab01 Part 2"
+author: "Taylor Stacy"
+date: "Due date"
+output: 
+  html_document: 
+    number_section: no
+    toc: no
+    toc_depth: 3
+    toc_float: yes
+    code_folding: show
+    css: lab_templet.css
+---
+
+```{r setup, include=FALSE}
+#library(tidyverse)
+library(here)
+library(dplyr)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+# Pre-work
+#load required packages
+```{r}
+library(palmerpenguins)
+```
+
+```{r}
+# nc_births <- read_csv(here("Data/ncbirths2009_cleaned.csv"))
+nc_births <- read.csv("C:/Users/Taylor/Desktop/DATA358/Data/ncbirths2009_cleaned.csv")
+data("penguins")
+```
+
+```{r}
+penguins %>%
+  filter(species == "Gentoo") %>%
+  select(bill_length_mm, bill_depth_mm) %>%
+  arrange(desc(bill_length_mm))
+out_select_exl <- penguins %>%
+  select(year, island, species)
+head(out_select_exl)
+names(out_select_exl)
+
+out_select_ex2 <- penguins %>%
+  select(bill_length_mm: flipper_length_mm)
+head(out_select_ex2)
+names(out_select_ex2)
+```
+```{r}
+nc_birth1 <- nc_births %>%
+  select(sex, mage, marital) %>%
+  names()
+nc_birth2 <- nc_births %>%
+    select(weeks: bounce) %>%
+    names()
+nc_births3 <- nc_births %>%
+  select(-c(terms, hispmom, kessner)) %>%
+  names()
+  
+```
+
+```{r}
+out_filter_ex1 <- penguins %>%
+  filter(species == "Gentoo")
+head(out_filter_ex1)
+
+out_filter_ex2 <- penguins %>%
+  filter(species =="Adelie", island == "Dream")
+# can use ampersand instead of comma ( filter(species =="Adelie", island == "Dream") )
+head(out_filter_ex2)
+
+out_filter_ex3 <- penguins %>%
+  filter(flipper_length_mm <= 200)
+head(out_filter_ex3)
+
+out_filter_ex4 <- penguins %>%
+  top_n(1, wt=bill_length_mm) %>%
+  sample_frac(.1)
+head(out_filter_ex4)
+```
+
+```{r}
+# Moms who gave birth after 35
+ncbirth_risk1 <- nc_births %>% 
+  filter(mage>35)
+glimpse(ncbirth_risk1)
+
+# Age , marital status and race of the mothers who gave birth after 35.
+ncbirth_risk2 <- nc_births %>% 
+  select(mage, marital, racemom) %>% 
+  filter(mage>35)
+glimpse(ncbirth_risk2)
+```
+
+```{r}
+# use mutate to add new column, while keeping existing columns
+penguins_ex1 <- penguins %>% 
+  mutate(body_mass_oz = body_mass_g*0.035274)
+names(penguins)
+
+penguins_ex2 <- penguins %>% 
+  mutate(bill_ratio = bill_length_mm/bill_depth_mm,
+         body_mass_oz = body_mass_g*0.035274,
+         flipper_length_in = flipper_length_mm*0.0393701)
+names(penguins_ex2)
+```
+
+```{r}
+total_weight <- nc_births %>% 
+  mutate(bwt_oz= bpound+16+bounce)
+names(total_weight)
+```
+#arrange
+```{r}
+#df %>% 
+  #arrange(var_1, var_2, ...)
+
+penguins %>% 
+  arrange(bill_length_mm) %>% 
+  select(species, bill_length_mm) %>% 
+  head()
+
+penguins %>% 
+  arrange(desc(bill_length_mm)) %>% 
+  select(species, bill_length_mm) %>% 
+  head()
+
+penguins %>% 
+  arrange(bill_length_mm,
+          desc(flipper_length_mm)) %>% 
+  select(bill_length_mm,
+         flipper_length_mm) %>% 
+  head()
+
+nc_births %>% 
+  mutate(bwt_g = bounce*28.3495) %>% 
+  mutate(low = bwt_g < 2500)
+
+```
+
+#summarize
+```{r}
+# computes basic summary statistics on a dataset
+# generates a new data frame that will have a single row summarizing all oberservations in a the input variable
+
+penguins %>% 
+  summarize(bill_length_ave = mean(bill_length_mm,
+                                   na.rm = TRUE))
+penguins %>% 
+  summarize(bm_ave = mean(body_mass_g, na.rm = TRUE),
+            bm_sd = sd(body_mass_g, na.rm = TRUE),
+            fl_max = max(flipper_length_mm, na.rm = TRUE),
+            fl_median = median(flipper_length_mm, na.rm = TRUE))
+nc_births %>%
+  summarize(age_mean = mean(mage),
+            cignum_mean = mean(cignum),
+            cignum_max = max(cignum))
+nc_births %>% 
+  filter(cignum < 98) %>% 
+  summarize(cignum_mean = mean(cignum),
+            cignum_max = max(cignum))
+``` 
+  
+```{r}
+# group_by adds extra structure to your dataset - grouping information - which lays the groundwork for computation within the groups. use with summarize()
+  # df %>%
+      #group_by(a) %>% 
+      #summarize(mean_v1 = mean(v1))
+penguins %>% 
+  group_by(species) %>% 
+  summarize(mass_mean = mean(body_mass_g, na.rm = TRUE),
+            mass_sd = sd(body_mass_g, na.rm = TRUE))
+penguins %>%
+  filter(species == "Adelie", sex == "male") %>%
+  group_by(island) %>%
+  summarize(fl_max = max(flipper_length_mm),
+            fl_min = min(flipper_length_mm))
+nc_births %>% 
+  group_by(kessner) %>% 
+  summarize(mean_age = mean(mage))
+
+#check for missing values
+
+nc_births %>% 
+  select(everything()) %>% 
+  summarise_all(funs(sum(is.na(.))))
+
+nc_births %>% 
+  filter(mage >= 19) %>% 
+  mutate(bwt_ounces = bpound*16+bounce) %>% 
+  mutate(low_bwt = bwt_ounces*28.3495 < 2500) %>% 
+  group_by(plural, low_bwt) %>%
+  summarise(count = n(), 
+            bwt_mean=mean(bwt_ounces)) %>%
+  arrange(low_bwt) -> ncbirths_gr
+```
+

@@ -1,0 +1,47 @@
+---
+title: "DATA358 Lab01 Intro to R Part 1"
+author: "Taylor Stacy"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    number_section: no
+    toc: no
+    toc_depth: 3
+    toc_float: yes
+    code_folding: show
+    css: lab_templet.css
+---
+
+```{r setup, include=FALSE}
+#library(tidyverse)
+library(here)
+library(dplyr)
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+```{r eval= FALSE}
+# install from R console
+  # install.packages("tidyverse")
+  #install.packages(c('MASS'. 'gapminder'))
+```
+
+
+```{r}
+hist(mtcars$mpg)
+```
+
+To install packages from github
+- First install package 'remotes'
+- Install the package using 'install_github()'
+
+```{r}
+auto <- read.csv2(c("C:/Users/Taylor/Desktop/DATA358/DATA/Auto.csv"))
+```
+
+
+
+
+
+

@@ -1,0 +1,191 @@
+---
+title: "data358_lab4_notes"
+subtitle: "Classification Methods: k-nn"
+author: "Taylor Stacy"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    number_section: no
+    toc: no
+    toc_depth: 3
+    toc_float: yes
+    code_folding: show
+    css: lab_templet.css
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(here)
+library(caret)
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+# *k*-Nearest Neighbor (*k*-NN)
+  If it walks like a duck, quacks like a duck, then it is probably a duck
+## Data
+```{r, show_col_types = FALSE}
+titanic <- read_csv(here("DATA358","Data","titanic3.csv"))
+
+titanic <- titanic %>% 
+  select(-c(name, boat, body, ticket, home.dest))
+dim(titanic)
+```
+## Missing Values
+```{r}
+titanic %>% 
+  summarise_all(funs(sum(is.na(.)))) %>% 
+  gather() %>% 
+  mutate(percent=round(value/sum(value)*100,2))
+```
+- How to Handle Missing Data
+  - Drop features with more than 30% missing values
+  - Delete rows with missing values with more than 75% of the column
+  - Numerical Features :replace the missing values bu either mean or median
+  - Categorical features: replace the missing values with the "most frequent category"
+
+### Age
+```{r}
+titanic %>% 
+  group_by(sex) %>% 
+  summarise(mean=mean(age,
+                      na.rm = TRUE))
+titanic2 <- titanic %>% 
+  group_by(sex) %>%
+  mutate(age=ifelse(is.na(age),
+                    mean(age, na.rm = TRUE),
+                    age)) %>% 
+  ungroup()
+titanic2 %>% 
+  summarise_all(funs(sum(is.na(.)))) %>% 
+  gather() %>% 
+  mutate(percent=round(value/sum(value)*100,2))
+```
+### Fare
+```{r}
+titanic2 %>% 
+  filter(is.na(fare)) %>% 
+  select(pclass, fare)
+titanic2 <- titanic2 %>% 
+  group_by(pclass) %>% 
+  mutate(fare = ifelse(is.na(fare),
+                       mean(fare, na.rm = T),
+                       fare)) %>% 
+  ungroup()
+titanic2 %>% 
+  summarise_all(funs(sum(is.na(.)))) %>% 
+  gather() %>% 
+  mutate(percent=round(value/sum(value)*100,2))
+```
+
+### Embarked
+```{r}
+titanic %>% 
+  group_by(embarked) %>%
+  summarize(count=n()) %>% 
+  mutate(prop=round(count/sum(count),2)) %>% 
+  ungroup()
+titanic2 <- titanic2 %>% 
+  mutate(embarked = ifelse(is.na(embarked),
+                           'S', embarked))
+```
+### Cabin
+```{r}
+titanic2 <- titanic2 %>% 
+  select(-cabin)
+titanic2 %>% 
+  summarise_all(funs(sum(is.na(.)))) %>% 
+  gather()
+```
+Too many missing values, so will drop this variable from the data set.
+
+## Data Preprocessing
+```{r}
+#sapply(titanic2,FUN)
+
+titanic2 <- titanic2 %>% 
+  mutate(pclass=factor(pclass, labels = c('first','second','third')),
+         survived=factor(survived, labels = c('died','survived')),
+         sex=factor(sex),
+         emabrked=factor(embarked))
+str(titanic2)
+```
+## Data Standardization
+```{r}
+titanic2 <- titanic2 %>% 
+  mutate(age= scale(age), fare= scale(fare), sibsp = scale(sibsp), parch = scale(parch))
+titanic2 %>% 
+  select(where(is.numeric)) %>% 
+  summarize((across(everything(),
+                    c(mean=mean, sd=sd))))
+```
+- Standardization
+  - the k-NN calssifier is very sensitive to the sale of measurements of features
+  - standardize all **numerical features** such that they all have a mean=0 and a sd=1
+
+## *k*-NN Model
+### Data Splitting
+```{r}
+set.seed(1234)
+inTrain <- createDataPartition(titanic2$survived,
+                               p = 0.8,
+                               list = F)
+train <- titanic2[inTrain,]
+test <- titanic2[-inTrain,]
+```
+- The variable used to partition the data (`survived`) to make sure the distribution is equal in the model
+   - Use the response variable
+
+### Choosing k
+```{r}
+knnGrid <- expand.grid(k=c(2:20))
+```
+- We will choose the value of *k* that will yield the best evaluation metric (e.g area under ROC)
+  - This can be achieved using repeated cross validation
+  - Create a grid of inputs, with *k* ranging from 2:20
+
+### trainControl parameters
+```{r}
+fitControl <- trainControl(method = "repeatedcv",
+                           number = 10,
+                           repeats = 5,
+                           classProbs = TRUE,
+                           summaryFunction = twoClassSummary)
+```
+- `summaryFunction = twoClassSummary`: Compute performance metrics across re-samples
+- `classProbs = TRUE`: computes class probability in each re-sample, Class probabilities are needed to compute `twoClassSummmary`
+
+### Train Model
+```{r}
+set.seed(1234)
+knnFit <- train(survived~.,
+                data = train,
+                method = "knn",
+                trControl = fitControl,
+                tuneGrid = knnGrid,
+                metric = "ROC")
+knnFit
+```
+### Repeated Coss Validation Results
+```{r}
+plot(knnFit)
+summary(knnFit)
+
+knnFit$bestTune
+```
+- Best tune
+  - *k* = 10
+  - ROC 0.8196937
+  - Sensitivity = 0.8685048
+  - Specificity = 0.617
+### Prediction and Model Evaluation
+```{r}
+knnPredict <- predict(knnFit, newdata = test)
+
+# Get confusion matrix to see accuracy values and other parameter values
+caret::confusionMatrix(knnPredict,
+                       positive = "survived",
+                       test$survived)
+```
+
+

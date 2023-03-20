@@ -1,0 +1,140 @@
+---
+title: "data 358 lab 6 notes"
+subtitle: "Classification Methods: LDA and QDA"
+author: "Taylor Stacy"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    number_section: no
+    toc: no
+    toc_depth: 3
+    toc_float: yes
+    code_folding: show
+    css: lab_templet.css
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(caret)
+library(rsample)
+library(MASS)
+library(here)
+library(dplyr)
+library(reshape2)
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+```{r}
+# clears environment
+rm(list = ls())
+```
+
+# Data
+```{r}
+vehicle <- read_csv(here("Data/vehicle3.csv"))
+str(vehicle)
+sapply(vehicle,class)
+```
+## Cleaning Data
+```{r}
+# remove ID variable and convert class to factor
+vehicle <- vehicle %>% 
+  dplyr::select(-1) %>% 
+  mutate(Class = factor(Class))
+table(vehicle$Class)
+```
+
+- 18 predictors: $p=18$ 
+- 3 categories: $k=3$
+
+# Data Exploration
+## Missing Values
+```{r}
+anyNA(vehicle)
+```
+- No missing values
+
+## Predictor Distributions
+```{r}
+# Create a box plot for all predictors
+# reshape to long format
+
+melt_df <- melt(vehicle[-19])
+
+ggplot(melt_df, aes(x=variable, y=value))+
+  geom_boxplot()+
+  facet_wrap(~variable, scale = "free")
+```
+
+- There are few features with highly skewed distribution. Ideally we would transform these variables to make more symmetric
+
+## Check equal variance
+```{r}
+summary(vehicle[-19])
+```
+
+##  Model Training
+```{r}
+set.seed(1234)
+inTrain <- vehicle$Class %>% 
+  createDataPartition(p =0.7,
+                      list = FALSE)
+train <- vehicle[inTrain,]
+test <- vehicle[-inTrain,]
+```
+
+# Linear Discriminant Analysis (LDA) Model
+- Use the `lsa()` function of the `MASS` package
+
+## LDA: Model Training
+```{r}
+lda_fit <- lda(Class ~ ., data = train)
+lda_fit
+```
+## Stat Histogram
+```{r}
+lda.values <- predict(lda_fit)
+ldahist(data = lda.values$x[,1], g = train$Class)
+```
+
+## Scatterplot of discrimant functions
+```{r}
+# extract loadings
+loadings <- data.frame((lda.values$x))
+# add Class variable as factor
+loadings  <- loadings %>% 
+  mutate(Type = as.factor(train$Class))
+
+# Plot LD1 and LD2
+ggplot(data = loadings, aes(x = LD1,
+                            y = LD2,
+                            color = Type,
+                            shape = Type))+
+  geom_point()
+```
+
+## Prediction Matrix
+```{r}
+# Make predictions on test set
+pred_test <- predict(lda_fit,test)
+
+# extract prediction class
+pred_class <- as.factor(pred_test$class)
+
+confusionMatrix(pred_class, as.factor(test$Class))
+```
+# Quadratic Discriminant Analysis (QDA) Model
+```{r}
+qda_fit <- qda(Class ~ ., data = train)
+qda_fit
+```
+
+## Confusion Matrix
+```{r}
+pred_test2 <- predict(qda_fit,test)
+pred_class2 <- as.factor(pred_test2$class)
+
+confusionMatrix(pred_class2, as.factor(test$Class))
+```

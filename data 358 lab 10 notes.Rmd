@@ -1,0 +1,105 @@
+---
+title: 'DATA 358: Lab 10'
+subtitle: "Principal Component Analysis (PCA)"
+author: "Taylor Stacy"
+date: "4/29/2022"
+output:
+  html_document:
+    number_section: no
+    toc: no
+    toc_depth: 3
+    toc_float: yes
+    code_folding: show
+    css: lab_templet.css
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+library(caret)
+library(cluster)
+library(tidyverse)
+library(corrplot)
+library(gridExtra)
+library(factoextra)
+library(here)
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+## Data
+```{r}
+url <- "https://koalaverse.github.io/homlr/data/my_basket.csv"
+my_basket <- readr::read_csv(url)
+dim(my_basket)
+```
+No data splitting in unsupervised learning because there is no response variable.
+
+## PCA
+```{r}
+pca_results <- prcomp(my_basket,
+                      center = TRUE,
+                      scale = TRUE,)
+names(pca_results)
+
+```
+```{r}
+pca_results$rotation <- -pca_results$rotation
+
+round(pca_results$rotation[1:10,1:4],4)
+```
+```{r}
+eig.val <- get_eigenvalue(pca_results)
+round(eig.val[1:10,],4)
+```
+
+```{r}
+pve <- pca_results$sdev^2/sum(pca_results$sdev^2)
+cum.pve <- cumsum(pve)
+```
+
+```{r}
+options(scipen = 999)
+PVEPlot <- qplot(c(1:42), pve)+
+  geom_line()+
+  xlab("Principle Component")+
+  ylab("PVE")+
+  ggtitle("Scree Plot")+
+  ylim(0,0.5)
+PVEPlot
+```
+
+```{r}
+cumPVE <- qplot(c(1:42), cum.pve)+
+  geom_line()+
+  geom_hline(yintercept = 0,
+             linetype = "dotted",
+             color = "blue")+
+  xlab("principle OCmponent")+
+  ylab(NULL)+
+  ggtitle("Plot")
+cumPVE
+```
+
+```{r}
+contri.comp1 <- fviz_contrib(pca_results,
+                             choice = "var",
+                             axes = 1,
+                             top = 10)
+contri.comp2 <- fviz_contrib(pca_results,
+                             choice = "var",
+                             axes = 2,
+                             top = 10)
+grid.arrange(contri.comp1, contri.comp2, nrow=1)
+```
+
+```{r}
+fviz_pca(pca_results,
+             col.var = "contrib",
+             gradient.cols = c("#00AFBB",
+                               "#E7B000",
+                               "#FC4E07"),
+             repel = T)
+```
+
+
